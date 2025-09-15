@@ -1,3 +1,6 @@
+
+![Docker Build](https://github.com/irctrakz/wgslirp/actions/workflows/docker.yml/badge.svg)
+
 # Userspace WireGuard slirp Router
 
 A high-performance, user-space WireGuard router that forwards decrypted IPv4 traffic via generic TCP/UDP/ICMP socket bridges (slirp-style), requiring no kernel privileges or custom netstacks.
