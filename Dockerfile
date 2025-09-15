@@ -10,15 +10,15 @@ RUN go mod download
 COPY . .
 
 # Build static-ish binary
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o wgrouter ./cmd/wgrouter
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o wgslirp ./cmd/wgslirp
 
 # --- Runtime stage ---
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
-COPY --from=build /src/wgrouter /usr/local/bin/wgrouter
+COPY --from=build /src/wgslirp /usr/local/bin/wgslirp
 # Default configuration can be overridden via env
 
 EXPOSE 51820/udp
 
-ENTRYPOINT ["/usr/local/bin/wgrouter"]
+ENTRYPOINT ["/usr/local/bin/wgslirp"]

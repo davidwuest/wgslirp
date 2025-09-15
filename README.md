@@ -1,6 +1,6 @@
-# Userspace WireGuard Router
+# Userspace WireGuard slirp Router
 
-A high-performance, userspace WireGuard router that forwards decrypted IPv4 traffic via generic TCP/UDP/ICMP socket bridges (slirp-style), requiring no kernel privileges or custom netstacks.
+A high-performance, user-space WireGuard router that forwards decrypted IPv4 traffic via generic TCP/UDP/ICMP socket bridges (slirp-style), requiring no kernel privileges or custom netstacks.
 
 ## Table of Contents
 
@@ -69,7 +69,7 @@ The easiest way to run the router is using Docker:
 
 ```bash
 docker run -d \
-  --name wgrouter \
+  --name wgslirp \
   -p 51820:51820/udp \
   -e WG_PRIVATE_KEY=<your-private-key> \
   -e WG_LISTEN_PORT=51820 \
@@ -87,7 +87,7 @@ git clone https://github.com/irctrakz/wgslirp.git
 cd wgslirp
 
 # Build the binary
-go build -o wgrouter ./cmd/wgrouter
+go build -o wgslirp ./cmd/wgslirp
 
 # Or build the Docker image
 docker build -t wgslirp -f Dockerfile .
@@ -113,7 +113,7 @@ Get up and running quickly with these steps:
 2. **Start the Router**:
    ```bash
    docker run -d \
-     --name wgrouter \
+     --name wgslirp \
      -p 51820:51820/udp \
      -e WG_PRIVATE_KEY=$(cat private.key) \
      -e WG_PEERS="public_key=$(cat peer-public.key),allowed_ips=10.0.0.2/32" \
@@ -137,7 +137,7 @@ Get up and running quickly with these steps:
 4. **Verify Connection**:
    ```bash
    # Check router logs
-   docker logs wgrouter
+   docker logs wgslirp
    
    # From client, ping through the tunnel
    ping 10.0.0.1
@@ -318,7 +318,7 @@ ICMP echo and other raw ICMP operations require raw socket privileges (e.g., `CA
 
 ```bash
 docker run -d \
-  --name wgrouter \
+  --name wgslirp \
   -p 51820:51820/udp \
   -e WG_PRIVATE_KEY=<base64-private-key> \
   -e WG_PEERS="public_key=<base64-public-key>,allowed_ips=10.0.0.2/32,endpoint=peer.example.com:51820" \
@@ -329,7 +329,7 @@ docker run -d \
 
 ```bash
 docker run -d \
-  --name wgrouter \
+  --name wgslirp \
   -p 51820:51820/udp \
   -e WG_PRIVATE_KEY=<base64-private-key> \
   -e WG_PEERS="public_key=<base64-public-key>,allowed_ips=10.0.0.2/32" \
@@ -344,7 +344,7 @@ docker run -d \
 
 ```bash
 docker run -d \
-  --name wgrouter \
+  --name wgslirp \
   -p 51820:51820/udp \
   -e WG_PRIVATE_KEY=<base64-private-key> \
   -e WG_PEERS="public_key=<base64-public-key>,allowed_ips=10.0.0.0/24,192.168.1.0/24" \
@@ -409,7 +409,7 @@ Enable debug mode to get verbose logging:
 
 ```bash
 docker run -d \
-  --name wgrouter \
+  --name wgslirp \
   -p 51820:51820/udp \
   -e WG_PRIVATE_KEY=<base64-private-key> \
   -e WG_PEERS="public_key=<base64-public-key>,allowed_ips=10.0.0.2/32" \
@@ -420,7 +420,7 @@ docker run -d \
 View logs with:
 
 ```bash
-docker logs wgrouter
+docker logs wgslirp
 ```
 
 ## License
