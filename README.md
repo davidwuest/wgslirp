@@ -7,7 +7,7 @@ A high-performance, userspace WireGuard router that forwards decrypted IPv4 traf
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Installation](#installation)
-  - [Using Docker](#using-docker)
+  - [Using Docker](#using-docker)git add -Agit commit -m "Initial commit"
   - [Building from Source](#building-from-source)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
