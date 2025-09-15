@@ -62,10 +62,7 @@ type tcpBridge struct {
 	// it (policy-controlled) to avoid indefinite stalls. 0 disables.
 	ackIdleFail time.Duration
 
-    // (FlowManager removed)
-
-	// debug toggles verbose per-flow tracing via env TCP_DEBUG_FLOW=1
-	debug bool
+    // debug removed (was verbose per-flow tracing)
 
 	// Optional MSS clamp (bytes). When >0, we clamp advertised MSS in
 	// SYN-ACK and the effective segmentation MSS to min(client, clamp, MTU-40).
@@ -79,39 +76,39 @@ type tcpBridge struct {
 	// RTO retransmissions observed (for diagnostics/metrics)
 	rtoCount uint64
 
-    // RTO metrics tracking
-    rtoMu              sync.Mutex
-    rtoActiveFlows     map[string]bool // Tracks flows currently in RTO retransmission
-    rtoMetricsDumped   bool            // Flag to prevent repeated dumps for the same event
-    rtoMetricsDumpTime time.Time       // Last time metrics were dumped
+	// RTO metrics tracking
+	rtoMu              sync.Mutex
+	rtoActiveFlows     map[string]bool // Tracks flows currently in RTO retransmission
+	rtoMetricsDumped   bool            // Flag to prevent repeated dumps for the same event
+	rtoMetricsDumpTime time.Time       // Last time metrics were dumped
 
-    // ACK classification counters (userspace visibility for return path)
-    ackAdv     uint64 // ACK advanced sndUna
-    ackDup     uint64 // Duplicate ACK (no payload, ack==sndUna)
-    ackWndOnly uint64 // Pure window update (ack==sndUna, window increased)
+	// ACK classification counters (userspace visibility for return path)
+	ackAdv     uint64 // ACK advanced sndUna
+	ackDup     uint64 // Duplicate ACK (no payload, ack==sndUna)
+	ackWndOnly uint64 // Pure window update (ack==sndUna, window increased)
 
-    // Optional per-ACK trace (debug)
-    ackTrace bool
+	// Optional per-ACK trace (debug)
+	ackTrace bool
 
-    // Async dial + pending buffering instrumentation
-    dialStart   uint64
-    dialOk      uint64
-    dialFail    uint64
-    dialInflight int64
+	// Async dial + pending buffering instrumentation
+	dialStart    uint64
+	dialOk       uint64
+	dialFail     uint64
+	dialInflight int64
 
-    pendEnq   uint64
-    pendFlush uint64
-    pendDrop  uint64
+	pendEnq   uint64
+	pendFlush uint64
+	pendDrop  uint64
 
-    // Default per-flow pre-connect pending cap (bytes)
-    defaultPendCap int
+	// Default per-flow pre-connect pending cap (bytes)
+	defaultPendCap int
 
-    // Handshake logging toggle (SYN-ACK MSS). Enable via TCP_LOG_HANDSHAKE=1|true|on|yes
-    logHandshake bool
+	// Handshake logging toggle (SYN-ACK MSS). Enable via TCP_LOG_HANDSHAKE=1|true|on|yes
+	logHandshake bool
 
-    // Send-gate logging controls
-    gateLogDisabled bool // disable "TCP send-gated" logs entirely
-    gateLogDebug    bool // log send-gated at debug level instead of info
+	// Send-gate logging controls
+	gateLogDisabled bool // disable "TCP send-gated" logs entirely
+	gateLogDebug    bool // log send-gated at debug level instead of info
 }
 
 type tcpState int
@@ -130,13 +127,13 @@ type tcpFlow struct {
 	srcPort uint16
 	dstPort uint16
 
-    conn *net.TCPConn
-    // Deferred connect support
-    connecting  bool
-    pendMu      sync.Mutex
-    pending     [][]byte
-    pendingBytes int
-    pendCap     int // max bytes to buffer before connect (per flow)
+	conn *net.TCPConn
+	// Deferred connect support
+	connecting   bool
+	pendMu       sync.Mutex
+	pending      [][]byte
+	pendingBytes int
+	pendCap      int // max bytes to buffer before connect (per flow)
 
 	// Sequence tracking
 	clientISN uint32
@@ -199,10 +196,10 @@ type tcpFlow struct {
 	rtoStop chan struct{}
 
 	// Notify sender when ACK/window updates arrive.
-    ackCh chan struct{}
+	ackCh chan struct{}
 
-    // handshake state
-    synAckSent bool
+	// handshake state
+	synAckSent bool
 
 	// SACK loss recovery (RFC 6675 simplified)
 	sackRecovery bool
@@ -223,31 +220,28 @@ type tcpFlow struct {
 	ccEnabled bool
 	mss       int
 
-    // Throttled logging for send-gated (zero-window/cwnd) messages
-    gateMu          sync.Mutex
-    lastGateLog     time.Time
-    suppressedGates int
-
-    // Handshake logging toggle (SYN-ACK MSS). Enable via TCP_LOG_HANDSHAKE=1|true|on|yes
-    logHandshake bool
+	// Throttled logging for send-gated (zero-window/cwnd) messages
+	gateMu          sync.Mutex
+	lastGateLog     time.Time
+	suppressedGates int
 }
 
 // newTCPBridge constructs a TCP bridge instance and wires optional per-flow
 // scheduling/backpressure via the parent's FlowManager when present.
 func newTCPBridge(parent *SocketInterface) *tcpBridge {
-    b := &tcpBridge{
-		parent:         parent,
-		flows:          make(map[string]*tcpFlow),
-		stopCh:         make(chan struct{}),
-		lifetime:       2 * time.Minute,
-		ackDelay:       10 * time.Millisecond,
-		reasmCap:       128 * 1024,
-        // Defaults: proactively gate reads after 6s of no ACK progress,
-        // and fail/reset truly stuck flows after 120s.
-        ackIdleGate:     6 * time.Second,
-        ackIdleFail:     120 * time.Second,
-        rtoActiveFlows: make(map[string]bool),
-    }
+	b := &tcpBridge{
+		parent:   parent,
+		flows:    make(map[string]*tcpFlow),
+		stopCh:   make(chan struct{}),
+		lifetime: 2 * time.Minute,
+		ackDelay: 10 * time.Millisecond,
+		reasmCap: 128 * 1024,
+		// Defaults: proactively gate reads after 6s of no ACK progress,
+		// and fail/reset truly stuck flows after 120s.
+		ackIdleGate:    6 * time.Second,
+		ackIdleFail:    120 * time.Second,
+		rtoActiveFlows: make(map[string]bool),
+	}
 	// Allow tuning of ACK delay via env (milliseconds).
 	if v := strings.TrimSpace(os.Getenv("TCP_ACK_DELAY_MS")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -270,10 +264,6 @@ func newTCPBridge(parent *SocketInterface) *tcpBridge {
 			b.ackIdleFail = time.Duration(n) * time.Second
 		}
 	}
-    // (FlowManager removed)
-    if strings.TrimSpace(os.Getenv("TCP_DEBUG_FLOW")) == "1" {
-        b.debug = true
-    }
 	if v := strings.TrimSpace(os.Getenv("TCP_ACK_TRACE")); v == "1" || strings.ToLower(v) == "true" {
 		b.ackTrace = true
 	}
@@ -289,9 +279,9 @@ func newTCPBridge(parent *SocketInterface) *tcpBridge {
 			b.paceUS = n
 		}
 	}
-    // Clean mode removed (EMERGENCY_DISABLED no longer used)
-    // Configure error signaling policy
-    es := strings.ToLower(strings.TrimSpace(os.Getenv("TCP_ERROR_SIGNAL")))
+	// Clean mode removed (EMERGENCY_DISABLED no longer used)
+	// Configure error signaling policy
+	es := strings.ToLower(strings.TrimSpace(os.Getenv("TCP_ERROR_SIGNAL")))
 	switch es {
 	case "", "icmp":
 		b.errorSignal = "icmp"
@@ -303,41 +293,43 @@ func newTCPBridge(parent *SocketInterface) *tcpBridge {
 		b.errorSignal = "icmp"
 	}
 
-    // Optional handshake log toggle
-    if v := strings.TrimSpace(os.Getenv("TCP_LOG_HANDSHAKE")); v != "" {
-        vv := strings.ToLower(v)
-        if vv == "1" || vv == "true" || vv == "on" || vv == "yes" { b.logHandshake = true }
-    }
+	// Optional handshake log toggle
+	if v := strings.TrimSpace(os.Getenv("TCP_LOG_HANDSHAKE")); v != "" {
+		vv := strings.ToLower(v)
+		if vv == "1" || vv == "true" || vv == "on" || vv == "yes" {
+			b.logHandshake = true
+		}
+	}
 
-    // Send-gated logging controls
-    // TCP_GATE_LOG values:
-    //   off/0/false -> disable send-gated logs
-    //   debug       -> log at debug level
-    //   info/1/true -> log at info (default)
-    if v := strings.ToLower(strings.TrimSpace(os.Getenv("TCP_GATE_LOG"))); v != "" {
-        switch v {
-        case "off", "0", "false", "no":
-            b.gateLogDisabled = true
-        case "debug":
-            b.gateLogDebug = true
-        case "info", "1", "true", "yes":
-            // default; keep info
-        default:
-            // unknown -> default
-        }
-    }
+	// Send-gated logging controls
+	// TCP_GATE_LOG values:
+	//   off/0/false -> disable send-gated logs
+	//   debug       -> log at debug level
+	//   info/1/true -> log at info (default)
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv("TCP_GATE_LOG"))); v != "" {
+		switch v {
+		case "off", "0", "false", "no":
+			b.gateLogDisabled = true
+		case "debug":
+			b.gateLogDebug = true
+		case "info", "1", "true", "yes":
+			// default; keep info
+		default:
+			// unknown -> default
+		}
+	}
 
-    // Log the creation of the TCP bridge
-    logging.Infof("Creating TCP bridge: lifetime=%v, ackDelay=%v, reasmCap=%d, errSignal=%s",
-        b.lifetime, b.ackDelay, b.reasmCap, b.errorSignal)
+	// Log the creation of the TCP bridge
+	logging.Infof("Creating TCP bridge: lifetime=%v, ackDelay=%v, reasmCap=%d, errSignal=%s",
+		b.lifetime, b.ackDelay, b.reasmCap, b.errorSignal)
 
-    // Default per-flow pending cap (bytes) before host connect completes
-    b.defaultPendCap = 64 * 1024
-    if v := strings.TrimSpace(os.Getenv("TCP_PEND_CAP_BYTES")); v != "" {
-        if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-            b.defaultPendCap = n
-        }
-    }
+	// Default per-flow pending cap (bytes) before host connect completes
+	b.defaultPendCap = 64 * 1024
+	if v := strings.TrimSpace(os.Getenv("TCP_PEND_CAP_BYTES")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			b.defaultPendCap = n
+		}
+	}
 
 	go b.reaper()
 	// Start connection health monitor
@@ -350,14 +342,16 @@ func newTCPBridge(parent *SocketInterface) *tcpBridge {
 // backpressure-aware retries on WG queue-full; otherwise, send inline via
 // the parent's processor. Returns true if the packet was accepted for send.
 func (b *tcpBridge) sendToGuest(f *tcpFlow, pkt []byte) bool {
-    if pkt == nil { return false }
-    // Prefer per-flow scheduler; if enqueue fails (queue full), fall back to inline send.
-    if b.parent != nil && b.parent.processor != nil {
-        if err := b.parent.processor.ProcessPacket(WrapPacket(pkt)); err == nil {
-            return true
-        }
-    }
-    return false
+	if pkt == nil {
+		return false
+	}
+	// Prefer per-flow scheduler; if enqueue fails (queue full), fall back to inline send.
+	if b.parent != nil && b.parent.processor != nil {
+		if err := b.parent.processor.ProcessPacket(WrapPacket(pkt)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // monitorConnectionHealth periodically checks for stalled connections and resets them.
@@ -497,7 +491,7 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 	b.mu.RLock()
 	flow := b.flows[key]
 	b.mu.RUnlock()
-    if flow == nil && (flags&fSYN) != 0 && (flags&fACK) == 0 {
+	if flow == nil && (flags&fSYN) != 0 && (flags&fACK) == 0 {
 		// Early cap check
 		if b.maxFlows > 0 {
 			b.mu.RLock()
@@ -511,70 +505,82 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 				return fmt.Errorf("tcp: flow cap reached")
 			}
 		}
-        // Fast pre-dial to detect immediate refusal before emitting SYN-ACK; fallback to async otherwise
-        var preConn *net.TCPConn
-        {
-            raddr := &net.TCPAddr{IP: net.IP(dstIP[:]), Port: int(dstPort)}
-            fastT := 5 * time.Millisecond
-            if v := strings.TrimSpace(os.Getenv("TCP_FAST_DIAL_MS")); v != "" {
-                if n, err := strconv.Atoi(v); err == nil && n >= 0 { fastT = time.Duration(n) * time.Millisecond }
-            }
-            d := net.Dialer{Timeout: fastT}
-            if c, err := d.Dial("tcp", raddr.String()); err == nil {
-                if tc, ok := c.(*net.TCPConn); ok { preConn = tc } else { _ = c.Close() }
-            } else {
-                if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
-                    // Hard failure: signal guest per policy and abort without SYN-ACK
-                    if b.parent != nil && b.parent.processor != nil {
-                        switch b.errorSignal {
-                        case "icmp":
-                            if icmp := buildICMPUnreachable(dstIP, srcIP, 1, pkt); icmp != nil { _ = b.parent.processor.ProcessPacket(WrapPacket(icmp)) }
-                        case "rst":
-                            rst := buildIPv4TCP(dstIP, srcIP, dstPort, srcPort, 0, seq+1, 0x04|0x10, nil)
-                            if rst != nil { _ = b.parent.processor.ProcessPacket(WrapPacket(rst)) }
-                        case "none":
-                        }
-                    }
-                    atomic.AddUint64(&b.parent.metrics.Errors, 1)
-                    return nil
-                }
-            }
-        }
-        serverISN := rand.Uint32()
-        candidate := &tcpFlow{
-            key:       key,
-            srcIP:     srcIP,
-            dstIP:     dstIP,
-            srcPort:   srcPort,
-            dstPort:   dstPort,
-            conn:      preConn,
-            connecting: preConn == nil,
-            clientISN: seq,
-            serverISN: serverISN,
-            clientNxt: seq + 1,
-            serverNxt: serverISN + 1,
-            sndUna:    serverISN + 1,
-            state:     tcpSynRcvd,
-            ooo:       nil,
-            tos:       pkt[1],
-            ttl:       pkt[8],
-            ackCh:     make(chan struct{}, 1),
-            pendCap:   b.defaultPendCap,
-        }
-        // Default MSS from effective MTU (respects runtime override)
-        defMSS := 1460
-        if b.parent != nil {
-            mtu := b.parent.EffectiveMTU()
-            if mtu <= 0 { mtu = b.parent.config.MTU }
-            v := mtu - 40
-            if v < 536 {
-                v = 536
-            }
-            if v > 1460 {
-                v = 1460
-            }
-            defMSS = v
-        }
+		// Fast pre-dial to detect immediate refusal before emitting SYN-ACK; fallback to async otherwise
+		var preConn *net.TCPConn
+		{
+			raddr := &net.TCPAddr{IP: net.IP(dstIP[:]), Port: int(dstPort)}
+			fastT := 5 * time.Millisecond
+			if v := strings.TrimSpace(os.Getenv("TCP_FAST_DIAL_MS")); v != "" {
+				if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+					fastT = time.Duration(n) * time.Millisecond
+				}
+			}
+			d := net.Dialer{Timeout: fastT}
+			if c, err := d.Dial("tcp", raddr.String()); err == nil {
+				if tc, ok := c.(*net.TCPConn); ok {
+					preConn = tc
+				} else {
+					_ = c.Close()
+				}
+			} else {
+				if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
+					// Hard failure: signal guest per policy and abort without SYN-ACK
+					if b.parent != nil && b.parent.processor != nil {
+						switch b.errorSignal {
+						case "icmp":
+							if icmp := buildICMPUnreachable(dstIP, srcIP, 1, pkt); icmp != nil {
+								_ = b.parent.processor.ProcessPacket(WrapPacket(icmp))
+							}
+						case "rst":
+							rst := buildIPv4TCP(dstIP, srcIP, dstPort, srcPort, 0, seq+1, 0x04|0x10, nil)
+							if rst != nil {
+								_ = b.parent.processor.ProcessPacket(WrapPacket(rst))
+							}
+						case "none":
+						}
+					}
+					atomic.AddUint64(&b.parent.metrics.Errors, 1)
+					return nil
+				}
+			}
+		}
+		serverISN := rand.Uint32()
+		candidate := &tcpFlow{
+			key:        key,
+			srcIP:      srcIP,
+			dstIP:      dstIP,
+			srcPort:    srcPort,
+			dstPort:    dstPort,
+			conn:       preConn,
+			connecting: preConn == nil,
+			clientISN:  seq,
+			serverISN:  serverISN,
+			clientNxt:  seq + 1,
+			serverNxt:  serverISN + 1,
+			sndUna:     serverISN + 1,
+			state:      tcpSynRcvd,
+			ooo:        nil,
+			tos:        pkt[1],
+			ttl:        pkt[8],
+			ackCh:      make(chan struct{}, 1),
+			pendCap:    b.defaultPendCap,
+		}
+		// Default MSS from effective MTU (respects runtime override)
+		defMSS := 1460
+		if b.parent != nil {
+			mtu := b.parent.EffectiveMTU()
+			if mtu <= 0 {
+				mtu = b.parent.config.MTU
+			}
+			v := mtu - 40
+			if v < 536 {
+				v = 536
+			}
+			if v > 1460 {
+				v = 1460
+			}
+			defMSS = v
+		}
 		// Apply MSS clamp (if configured) and MTU-derived cap
 		eff := defMSS
 		if b.mssClamp > 0 && b.mssClamp < eff {
@@ -637,142 +643,178 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 		}
 		// Insert under write lock with double-check
 		b.mu.Lock()
-        if exist := b.flows[key]; exist != nil {
-            b.mu.Unlock()
-            flow = exist
-        } else {
+		if exist := b.flows[key]; exist != nil {
+			b.mu.Unlock()
+			flow = exist
+		} else {
 			b.flows[key] = candidate
 			b.mu.Unlock()
 			flow = candidate
-            // Kick off async host dial; on success, attach conn, emit SYN-ACK (if not already), start reader, and flush pending
-            if flow.connecting {
-            go func(f *tcpFlow) {
-                atomic.AddUint64(&b.dialStart, 1)
-                atomic.AddInt64(&b.dialInflight, 1)
-                raddr := &net.TCPAddr{IP: net.IP(f.dstIP[:]), Port: int(f.dstPort)}
-                conn, err := net.DialTCP("tcp", nil, raddr)
-                if err != nil {
-                    // Signal guest per policy
-                    if b.parent != nil && b.parent.processor != nil {
-                        switch b.errorSignal {
-                        case "icmp":
-                            if icmp := buildICMPUnreachable(f.dstIP, f.srcIP, 1, pkt); icmp != nil {
-                                _ = b.parent.processor.ProcessPacket(WrapPacket(icmp))
-                            }
-                        case "rst":
-                            rst := buildIPv4TCP(f.dstIP, f.srcIP, f.dstPort, f.srcPort, 0, f.clientISN+1, 0x04|0x10, nil)
-                            if rst != nil { _ = b.parent.processor.ProcessPacket(WrapPacket(rst)) }
-                        case "none":
-                        }
-                    }
-                    atomic.AddUint64(&b.dialFail, 1)
-                    atomic.AddUint64(&b.parent.metrics.Errors, 1)
-                    atomic.AddInt64(&b.dialInflight, -1)
-                    // Remove the flow on dial failure
-                    b.removeFlow(f.key)
-                    return
-                }
-                // Configure socket options
-                _ = conn.SetNoDelay(true)
-                _ = conn.SetKeepAlive(true)
-                _ = conn.SetKeepAlivePeriod(30 * time.Second)
-                if v := strings.TrimSpace(os.Getenv("TCP_SOCK_RCVBUF")); v != "" {
-                    if n, err := strconv.Atoi(v); err == nil && n > 0 { _ = conn.SetReadBuffer(n) }
-                }
-                if v := strings.TrimSpace(os.Getenv("TCP_SOCK_SNDBUF")); v != "" {
-                    if n, err := strconv.Atoi(v); err == nil && n > 0 { _ = conn.SetWriteBuffer(n) }
-                }
-                f.conn = conn
-                f.connecting = false
-                f.lastAckTime = time.Now()
-                atomic.AddUint64(&b.dialOk, 1)
-                atomic.AddInt64(&b.dialInflight, -1)
-                // Send SYN-ACK now that dial succeeded (with MSS/WS/SACK options) unless already sent
-                {
-                    mss := uint16(1460)
-                    effMTU := 1500
-                    if b.parent != nil {
-                        effMTU = b.parent.EffectiveMTU()
-                        if effMTU <= 0 { effMTU = b.parent.config.MTU }
-                        val := effMTU - 40
-                        if val < 536 { val = 536 }
-                        if val > 1460 { val = 1460 }
-                        if b.mssClamp > 0 && val > b.mssClamp { val = b.mssClamp }
-                        mss = uint16(val)
-                    } else if b.mssClamp > 0 && int(mss) > b.mssClamp { mss = uint16(b.mssClamp) }
-                    synOpts := make([]byte, 0, 8)
-                    synOpts = append(synOpts, 2, 4, byte(mss>>8), byte(mss))
-                    wsOut := uint8(7)
-                    if v := strings.TrimSpace(os.Getenv("TCP_WS_OUT")); v != "" {
-                        if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 14 { wsOut = uint8(n) }
-                    }
-                    f.wsOut = wsOut
-                    synOpts = append(synOpts, 3, 3, byte(wsOut))
-                    if f.sackPermitted || strings.TrimSpace(os.Getenv("TCP_ENABLE_SACK")) == "1" { synOpts = append(synOpts, 4, 2) }
-                    synAck := buildIPv4TCPOpts(f.dstIP, f.srcIP, f.dstPort, f.srcPort, f.serverISN, f.clientISN+1, fSYN|fACK, nil, synOpts)
-                    if !f.synAckSent {
-                        f.synAckSent = true
-                    if b.logHandshake {
-                        logging.Infof("TCP SYN-ACK MSS: flow=%s effMTU=%d clamp=%d clientMSS=%d advMSS=%d",
-                            f.key, effMTU, b.mssClamp, int(f.clientMSS), int(mss))
-                    }
-                        _ = b.sendToGuest(f, synAck)
-                    }
-                }
-                // Start reader now that conn exists
-                go b.reader(f)
-                // Flush any pre-connect pending data and contiguous reassembly
-                b.flushPending(f)
-            }(flow)
-            }
-            // Emit SYN-ACK immediately; if dial later succeeds, the goroutine will avoid duplicate send.
-            if !flow.synAckSent {
-                mss := uint16(1460)
-                effMTU := 1500
-                if b.parent != nil {
-                    effMTU = b.parent.EffectiveMTU()
-                    if effMTU <= 0 { effMTU = b.parent.config.MTU }
-                    val := effMTU - 40
-                    if val < 536 { val = 536 }
-                    if val > 1460 { val = 1460 }
-                    if b.mssClamp > 0 && val > b.mssClamp { val = b.mssClamp }
-                    mss = uint16(val)
-                } else if b.mssClamp > 0 && int(mss) > b.mssClamp { mss = uint16(b.mssClamp) }
-                synOpts := make([]byte, 0, 8)
-                synOpts = append(synOpts, 2, 4, byte(mss>>8), byte(mss))
-                wsOut := uint8(7)
-                if v := strings.TrimSpace(os.Getenv("TCP_WS_OUT")); v != "" {
-                    if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 14 { wsOut = uint8(n) }
-                }
-                flow.wsOut = wsOut
-                synOpts = append(synOpts, 3, 3, byte(wsOut))
-                if flow.sackPermitted || strings.TrimSpace(os.Getenv("TCP_ENABLE_SACK")) == "1" { synOpts = append(synOpts, 4, 2) }
-                synAck := buildIPv4TCPOpts(dstIP, srcIP, dstPort, srcPort, serverISN, seq+1, fSYN|fACK, nil, synOpts)
-                if b.logHandshake {
-                    logging.Infof("TCP SYN-ACK MSS: flow=%s effMTU=%d clamp=%d clientMSS=%d advMSS=%d",
-                        key, effMTU, b.mssClamp, int(flow.clientMSS), int(mss))
-                }
-                _ = b.sendToGuest(flow, synAck)
-                flow.synAckSent = true
-            }
-            atomic.AddUint64(&b.metrics.ConnectionsCreated, 1)
-            atomic.AddUint64(&b.parent.metrics.ConnectionsCreated, 1)
-            // If already connected (fast pre-dial), start reader immediately
-            if flow.conn != nil {
-                go b.reader(flow)
-            }
-            return nil
-        }
+			// Kick off async host dial; on success, attach conn, emit SYN-ACK (if not already), start reader, and flush pending
+			if flow.connecting {
+				go func(f *tcpFlow) {
+					atomic.AddUint64(&b.dialStart, 1)
+					atomic.AddInt64(&b.dialInflight, 1)
+					raddr := &net.TCPAddr{IP: net.IP(f.dstIP[:]), Port: int(f.dstPort)}
+					conn, err := net.DialTCP("tcp", nil, raddr)
+					if err != nil {
+						// Signal guest per policy
+						if b.parent != nil && b.parent.processor != nil {
+							switch b.errorSignal {
+							case "icmp":
+								if icmp := buildICMPUnreachable(f.dstIP, f.srcIP, 1, pkt); icmp != nil {
+									_ = b.parent.processor.ProcessPacket(WrapPacket(icmp))
+								}
+							case "rst":
+								rst := buildIPv4TCP(f.dstIP, f.srcIP, f.dstPort, f.srcPort, 0, f.clientISN+1, 0x04|0x10, nil)
+								if rst != nil {
+									_ = b.parent.processor.ProcessPacket(WrapPacket(rst))
+								}
+							case "none":
+							}
+						}
+						atomic.AddUint64(&b.dialFail, 1)
+						atomic.AddUint64(&b.parent.metrics.Errors, 1)
+						atomic.AddInt64(&b.dialInflight, -1)
+						// Remove the flow on dial failure
+						b.removeFlow(f.key)
+						return
+					}
+					// Configure socket options
+					_ = conn.SetNoDelay(true)
+					_ = conn.SetKeepAlive(true)
+					_ = conn.SetKeepAlivePeriod(30 * time.Second)
+					if v := strings.TrimSpace(os.Getenv("TCP_SOCK_RCVBUF")); v != "" {
+						if n, err := strconv.Atoi(v); err == nil && n > 0 {
+							_ = conn.SetReadBuffer(n)
+						}
+					}
+					if v := strings.TrimSpace(os.Getenv("TCP_SOCK_SNDBUF")); v != "" {
+						if n, err := strconv.Atoi(v); err == nil && n > 0 {
+							_ = conn.SetWriteBuffer(n)
+						}
+					}
+					f.conn = conn
+					f.connecting = false
+					f.lastAckTime = time.Now()
+					atomic.AddUint64(&b.dialOk, 1)
+					atomic.AddInt64(&b.dialInflight, -1)
+					// Send SYN-ACK now that dial succeeded (with MSS/WS/SACK options) unless already sent
+					{
+						mss := uint16(1460)
+						effMTU := 1500
+						if b.parent != nil {
+							effMTU = b.parent.EffectiveMTU()
+							if effMTU <= 0 {
+								effMTU = b.parent.config.MTU
+							}
+							val := effMTU - 40
+							if val < 536 {
+								val = 536
+							}
+							if val > 1460 {
+								val = 1460
+							}
+							if b.mssClamp > 0 && val > b.mssClamp {
+								val = b.mssClamp
+							}
+							mss = uint16(val)
+						} else if b.mssClamp > 0 && int(mss) > b.mssClamp {
+							mss = uint16(b.mssClamp)
+						}
+						synOpts := make([]byte, 0, 8)
+						synOpts = append(synOpts, 2, 4, byte(mss>>8), byte(mss))
+						wsOut := uint8(7)
+						if v := strings.TrimSpace(os.Getenv("TCP_WS_OUT")); v != "" {
+							if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 14 {
+								wsOut = uint8(n)
+							}
+						}
+						f.wsOut = wsOut
+						synOpts = append(synOpts, 3, 3, byte(wsOut))
+						if f.sackPermitted || strings.TrimSpace(os.Getenv("TCP_ENABLE_SACK")) == "1" {
+							synOpts = append(synOpts, 4, 2)
+						}
+						synAck := buildIPv4TCPOpts(f.dstIP, f.srcIP, f.dstPort, f.srcPort, f.serverISN, f.clientISN+1, fSYN|fACK, nil, synOpts)
+						if !f.synAckSent {
+							f.synAckSent = true
+							if b.logHandshake {
+								logging.Infof("TCP SYN-ACK MSS: flow=%s effMTU=%d clamp=%d clientMSS=%d advMSS=%d",
+									f.key, effMTU, b.mssClamp, int(f.clientMSS), int(mss))
+							}
+							_ = b.sendToGuest(f, synAck)
+						}
+					}
+					// Start reader now that conn exists
+					go b.reader(f)
+					// Flush any pre-connect pending data and contiguous reassembly
+					b.flushPending(f)
+				}(flow)
+			}
+			// Emit SYN-ACK immediately; if dial later succeeds, the goroutine will avoid duplicate send.
+			if !flow.synAckSent {
+				mss := uint16(1460)
+				effMTU := 1500
+				if b.parent != nil {
+					effMTU = b.parent.EffectiveMTU()
+					if effMTU <= 0 {
+						effMTU = b.parent.config.MTU
+					}
+					val := effMTU - 40
+					if val < 536 {
+						val = 536
+					}
+					if val > 1460 {
+						val = 1460
+					}
+					if b.mssClamp > 0 && val > b.mssClamp {
+						val = b.mssClamp
+					}
+					mss = uint16(val)
+				} else if b.mssClamp > 0 && int(mss) > b.mssClamp {
+					mss = uint16(b.mssClamp)
+				}
+				synOpts := make([]byte, 0, 8)
+				synOpts = append(synOpts, 2, 4, byte(mss>>8), byte(mss))
+				wsOut := uint8(7)
+				if v := strings.TrimSpace(os.Getenv("TCP_WS_OUT")); v != "" {
+					if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 14 {
+						wsOut = uint8(n)
+					}
+				}
+				flow.wsOut = wsOut
+				synOpts = append(synOpts, 3, 3, byte(wsOut))
+				if flow.sackPermitted || strings.TrimSpace(os.Getenv("TCP_ENABLE_SACK")) == "1" {
+					synOpts = append(synOpts, 4, 2)
+				}
+				synAck := buildIPv4TCPOpts(dstIP, srcIP, dstPort, srcPort, serverISN, seq+1, fSYN|fACK, nil, synOpts)
+				if b.logHandshake {
+					logging.Infof("TCP SYN-ACK MSS: flow=%s effMTU=%d clamp=%d clientMSS=%d advMSS=%d",
+						key, effMTU, b.mssClamp, int(flow.clientMSS), int(mss))
+				}
+				_ = b.sendToGuest(flow, synAck)
+				flow.synAckSent = true
+			}
+			atomic.AddUint64(&b.metrics.ConnectionsCreated, 1)
+			atomic.AddUint64(&b.parent.metrics.ConnectionsCreated, 1)
+			// If already connected (fast pre-dial), start reader immediately
+			if flow.conn != nil {
+				go b.reader(flow)
+			}
+			return nil
+		}
 	}
 
 	if flow == nil {
 		// No flow: send RST per RFC depending on ACK flag
 		const fACK = 0x10
 		const fRST = 0x04
-        if (flags & fACK) != 0 {
+		if (flags & fACK) != 0 {
 			// RST with seq = ack
 			rst := buildIPv4TCP(dstIP, srcIP, dstPort, srcPort, ack, 0, fRST, nil)
-            if rst != nil { _ = b.sendToGuest(flow, rst) }
+			if rst != nil {
+				_ = b.sendToGuest(flow, rst)
+			}
 		} else {
 			// RST|ACK with ack = seq + len
 			segLen := uint32(len(payload))
@@ -784,7 +826,9 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 				segLen++
 			}
 			rst := buildIPv4TCP(dstIP, srcIP, dstPort, srcPort, 0, seq+segLen, fRST|fACK, nil)
-            if rst != nil { _ = b.sendToGuest(flow, rst) }
+			if rst != nil {
+				_ = b.sendToGuest(flow, rst)
+			}
 		}
 		return nil
 	}
@@ -808,21 +852,21 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 		return nil
 	case tcpEstablished:
 		// Handle ACK updates and possible FIN teardown
-        if (flags & fACK) != 0 {
-            // dupACK detection
-            if ack == flow.sndUna && len(payload) == 0 {
-                flow.dupAckCnt++
-                atomic.AddUint64(&b.ackDup, 1)
-            } else {
-                flow.dupAckCnt = 0
-            }
-            if ack != 0 && ack <= flow.serverNxt && ack > flow.sndUna {
-                prevUna := flow.sndUna
-                flow.sndUna = ack
-                flow.lastAckTime = time.Now()
-                atomic.AddUint64(&b.ackAdv, 1)
-                // drop acknowledged segments from txQueue and update RTT/RTO
-                now := time.Now()
+		if (flags & fACK) != 0 {
+			// dupACK detection
+			if ack == flow.sndUna && len(payload) == 0 {
+				flow.dupAckCnt++
+				atomic.AddUint64(&b.ackDup, 1)
+			} else {
+				flow.dupAckCnt = 0
+			}
+			if ack != 0 && ack <= flow.serverNxt && ack > flow.sndUna {
+				prevUna := flow.sndUna
+				flow.sndUna = ack
+				flow.lastAckTime = time.Now()
+				atomic.AddUint64(&b.ackAdv, 1)
+				// drop acknowledged segments from txQueue and update RTT/RTO
+				now := time.Now()
 				flow.txMu.Lock()
 				for len(flow.txQueue) > 0 {
 					head := flow.txQueue[0]
@@ -868,57 +912,49 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 						flow.cc.OnAck(diff)
 					}
 				}
-				if b.debug {
-					logging.Debugf("tcp ack flow=%s ack=%d una->%d nxt=%d wnd=%d dup=%d txq=%d",
-						flow.key, ack, prevUna, flow.serverNxt, flow.advWnd, flow.dupAckCnt, len(flow.txQueue))
-				}
+				// trimmed: per-flow verbose ack debug removed
 				// Notify sender waiters
 				select {
 				case flow.ackCh <- struct{}{}:
 				default:
 				}
 			}
-            // Track previous window to detect pure window updates that should wake senders.
-            prevWnd := flow.advWnd
-            wnd := uint32(binary.BigEndian.Uint16(pkt[tcpOff+14 : tcpOff+16]))
-            if flow.wsIn > 0 {
-                wnd = wnd << flow.wsIn
-            }
-            flow.advWnd = wnd
-            // If the peer opened its window without advancing ACK, wake senders.
-            if wnd > prevWnd {
-                // Treat as progress for idle tracking to avoid false ACK-idle.
-                flow.lastAckTime = time.Now()
-                // Count as window-only update if ACK did not advance
-                if ack <= flow.sndUna {
-                    atomic.AddUint64(&b.ackWndOnly, 1)
-                }
-                select {
-                case flow.ackCh <- struct{}{}:
-                default:
-                }
-            }
-            if b.ackTrace {
-                class := "adv"
-                if ack == flow.sndUna && len(payload) == 0 {
-                    class = "dup"
-                } else if ack <= flow.sndUna && wnd > prevWnd {
-                    class = "wnd"
-                }
-                logging.Infof("TCP ACK trace: flow=%s class=%s ack=%d sndUna=%d nxt=%d wnd=%d ws=%d txq=%d",
-                    flow.key, class, ack, flow.sndUna, flow.serverNxt, flow.advWnd, flow.wsIn, len(flow.txQueue))
-            }
+			// Track previous window to detect pure window updates that should wake senders.
+			prevWnd := flow.advWnd
+			wnd := uint32(binary.BigEndian.Uint16(pkt[tcpOff+14 : tcpOff+16]))
+			if flow.wsIn > 0 {
+				wnd = wnd << flow.wsIn
+			}
+			flow.advWnd = wnd
+			// If the peer opened its window without advancing ACK, wake senders.
+			if wnd > prevWnd {
+				// Treat as progress for idle tracking to avoid false ACK-idle.
+				flow.lastAckTime = time.Now()
+				// Count as window-only update if ACK did not advance
+				if ack <= flow.sndUna {
+					atomic.AddUint64(&b.ackWndOnly, 1)
+				}
+				select {
+				case flow.ackCh <- struct{}{}:
+				default:
+				}
+			}
+			if b.ackTrace {
+				class := "adv"
+				if ack == flow.sndUna && len(payload) == 0 {
+					class = "dup"
+				} else if ack <= flow.sndUna && wnd > prevWnd {
+					class = "wnd"
+				}
+				logging.Infof("TCP ACK trace: flow=%s class=%s ack=%d sndUna=%d nxt=%d wnd=%d ws=%d txq=%d",
+					flow.key, class, ack, flow.sndUna, flow.serverNxt, flow.advWnd, flow.wsIn, len(flow.txQueue))
+			}
 			// Parse SACK blocks if any and SACK permitted
 			if flow.sackPermitted || strings.TrimSpace(os.Getenv("TCP_ENABLE_SACK")) == "1" {
 				if dataOff > 20 {
 					opts := pkt[tcpOff+20 : tcpOff+dataOff]
 					parseSACKBlocks(flow, opts)
-					if b.debug {
-						flow.sackMu.Lock()
-						sb := flow.sackList
-						flow.sackMu.Unlock()
-						logging.Debugf("tcp sack flow=%s ack=%d blocks=%d", flow.key, ack, len(sb))
-					}
+						// trimmed: verbose SACK block debug removed
 				}
 			}
 			if len(payload) == 0 {
@@ -951,8 +987,8 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 		// Out-of-order tolerance: duplicate or future segments -> send dup ACK
 		if seq < flow.clientNxt {
 			// Duplicate segment; ACK current next expected
-        dupAck := buildIPv4TCP(flow.dstIP, flow.srcIP, flow.dstPort, flow.srcPort, flow.serverNxt, flow.clientNxt, fACK, nil)
-        _ = b.sendToGuest(flow, dupAck)
+			dupAck := buildIPv4TCP(flow.dstIP, flow.srcIP, flow.dstPort, flow.srcPort, flow.serverNxt, flow.clientNxt, fACK, nil)
+			_ = b.sendToGuest(flow, dupAck)
 			return nil
 		}
 		if seq > flow.clientNxt {
@@ -1015,52 +1051,52 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 			flow.mu.Unlock()
 
 			// Request retransmit with current ACK
-        dupAck := buildIPv4TCP(flow.dstIP, flow.srcIP, flow.dstPort, flow.srcPort, flow.serverNxt, flow.clientNxt, fACK, nil)
-        _ = b.sendToGuest(flow, dupAck)
+			dupAck := buildIPv4TCP(flow.dstIP, flow.srcIP, flow.dstPort, flow.srcPort, flow.serverNxt, flow.clientNxt, fACK, nil)
+			_ = b.sendToGuest(flow, dupAck)
 			return nil
 		}
 
 		// In-order data
-        if len(payload) > 0 {
-            // Log the payload for debugging
-            logging.Debugf("TCP bridge handling client->server data: %d bytes, data: %q",
-                len(payload), string(payload[:min(len(payload), 50)]))
+		if len(payload) > 0 {
+			// Log the payload for debugging
+			logging.Debugf("TCP bridge handling client->server data: %d bytes, data: %q",
+				len(payload), string(payload[:minInt(len(payload), 50)]))
 
-            // If not yet connected, enqueue into bounded pending buffer and ACK
-            if flow.conn == nil {
-                flow.pendMu.Lock()
-                if flow.pendCap <= 0 || flow.pendingBytes+len(payload) <= flow.pendCap {
-                    cp := append([]byte(nil), payload...)
-                    flow.pending = append(flow.pending, cp)
-                    flow.pendingBytes += len(cp)
-                    atomic.AddUint64(&b.pendEnq, 1)
-                } else {
-                    atomic.AddUint64(&b.pendDrop, 1)
-                    // Do not advance clientNxt for dropped bytes; let client retransmit later
-                    flow.pendMu.Unlock()
-                    // Send immediate ACK for already accepted bytes only
-                    b.scheduleAck(flow)
-                    return nil
-                }
-                flow.pendMu.Unlock()
-                // Accept bytes from client: advance ack and ACK back (even before server write)
-                flow.clientNxt += uint32(len(payload))
-                b.scheduleAck(flow)
-                return nil
-            }
+			// If not yet connected, enqueue into bounded pending buffer and ACK
+			if flow.conn == nil {
+				flow.pendMu.Lock()
+				if flow.pendCap <= 0 || flow.pendingBytes+len(payload) <= flow.pendCap {
+					cp := append([]byte(nil), payload...)
+					flow.pending = append(flow.pending, cp)
+					flow.pendingBytes += len(cp)
+					atomic.AddUint64(&b.pendEnq, 1)
+				} else {
+					atomic.AddUint64(&b.pendDrop, 1)
+					// Do not advance clientNxt for dropped bytes; let client retransmit later
+					flow.pendMu.Unlock()
+					// Send immediate ACK for already accepted bytes only
+					b.scheduleAck(flow)
+					return nil
+				}
+				flow.pendMu.Unlock()
+				// Accept bytes from client: advance ack and ACK back (even before server write)
+				flow.clientNxt += uint32(len(payload))
+				b.scheduleAck(flow)
+				return nil
+			}
 
-            if n, err := flow.conn.Write(payload); err != nil {
-                atomic.AddUint64(&b.parent.metrics.Errors, 1)
-                logging.Errorf("TCP bridge write error: %v", err)
-                return fmt.Errorf("tcp: write: %w", err)
-            } else {
-                atomic.AddUint64(&b.metrics.BytesSent, uint64(n))
-                atomic.AddUint64(&b.metrics.PacketsSent, 1)
-                atomic.AddUint64(&b.parent.metrics.BytesSent, uint64(n))
-                atomic.AddUint64(&b.parent.metrics.PacketsSent, 1)
-                logging.Debugf("TCP bridge successfully wrote %d bytes to server", n)
-            }
-            flow.clientNxt += uint32(len(payload))
+			if n, err := flow.conn.Write(payload); err != nil {
+				atomic.AddUint64(&b.parent.metrics.Errors, 1)
+				logging.Errorf("TCP bridge write error: %v", err)
+				return fmt.Errorf("tcp: write: %w", err)
+			} else {
+				atomic.AddUint64(&b.metrics.BytesSent, uint64(n))
+				atomic.AddUint64(&b.metrics.PacketsSent, 1)
+				atomic.AddUint64(&b.parent.metrics.BytesSent, uint64(n))
+				atomic.AddUint64(&b.parent.metrics.PacketsSent, 1)
+				logging.Debugf("TCP bridge successfully wrote %d bytes to server", n)
+			}
+			flow.clientNxt += uint32(len(payload))
 			// Flush any contiguous buffered segments
 			flow.mu.Lock()
 			for len(flow.ooo) > 0 {
@@ -1068,7 +1104,7 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 				if s.seq != flow.clientNxt {
 					break
 				}
-                if n, err := flow.conn.Write(s.data); err != nil {
+				if n, err := flow.conn.Write(s.data); err != nil {
 					flow.mu.Unlock()
 					atomic.AddUint64(&b.parent.metrics.Errors, 1)
 					return fmt.Errorf("tcp: write (reassembly): %w", err)
@@ -1093,12 +1129,14 @@ func (b *tcpBridge) HandleOutbound(pkt []byte) error {
 			if seq == flow.clientNxt {
 				flow.clientNxt += 1
 			}
-            if flow.conn != nil { _ = flow.conn.CloseWrite() }
-            finAck := buildIPv4TCP(flow.dstIP, flow.srcIP, flow.dstPort, flow.srcPort, flow.serverNxt, flow.clientNxt, fACK, nil)
-            _ = b.sendToGuest(flow, finAck)
-            flow.state = tcpFinWait
-        }
-        return nil
+			if flow.conn != nil {
+				_ = flow.conn.CloseWrite()
+			}
+			finAck := buildIPv4TCP(flow.dstIP, flow.srcIP, flow.dstPort, flow.srcPort, flow.serverNxt, flow.clientNxt, fACK, nil)
+			_ = b.sendToGuest(flow, finAck)
+			flow.state = tcpFinWait
+		}
+		return nil
 	case tcpFinWait:
 		// Await final ACK from client; if received, close
 		if (flags&fACK) != 0 && (!flow.finSent || ack == flow.serverNxt) {
@@ -1166,9 +1204,7 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 							f.rto = 2 * time.Second
 						}
 					}
-					if b.debug {
-						logging.Debugf("tcp rto-rexmit flow=%s idx=%d seq=%d len=%d rto=%v", f.key, idx, seg.seq, len(seg.data), f.rto)
-					}
+					// trimmed: per-flow RTO debug removed
 					f.txMu.Unlock()
 
 					// Track this flow as being in RTO state
@@ -1177,9 +1213,9 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 					pkt := buildIPv4TCPWithIP(f.dstIP, f.srcIP, f.dstPort, f.srcPort,
 						seg.seq, f.clientNxt, 0x18, seg.data, f.tos, f.ttl)
 					if pkt != nil {
-        if !b.sendToGuest(f, pkt) {
-            // fallthrough: nothing to do; metrics/cc updated below
-        }
+						if !b.sendToGuest(f, pkt) {
+							// fallthrough: nothing to do; metrics/cc updated below
+						}
 						if f.ccEnabled && f.cc != nil {
 							f.cc.OnLoss(true)
 						}
@@ -1192,7 +1228,6 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 		}
 	}()
 	for {
-        // (FlowManager-based read gating removed)
 		// Window/cwnd-based backpressure: if there is no room to send
 		// additional bytes to the client (advWnd/cwnd fully consumed by
 		// in-flight), wait for ACK/window updates before reading more from the
@@ -1242,7 +1277,9 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 					if b.ackIdleFail > 0 && time.Since(f.lastAckTime) >= b.ackIdleFail {
 						if b.errorSignal == "rst" || b.errorSignal == "icmp" {
 							rst := buildIPv4TCP(f.dstIP, f.srcIP, f.dstPort, f.srcPort, f.serverNxt, f.clientNxt, 0x14, nil) // RST|ACK
-                    if rst != nil { _ = b.sendToGuest(f, rst) }
+							if rst != nil {
+								_ = b.sendToGuest(f, rst)
+							}
 						}
 						logging.Warnf("TCP ACK-idle failure: resetting stalled flow %s after %v idle (inFlight=%d, lastAck=%d, serverNxt=%d)",
 							f.key, time.Since(f.lastAckTime).Round(time.Second), inFlight, f.lastAck, f.serverNxt)
@@ -1270,7 +1307,7 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 
 			// Log data being sent back to client with more detail
 			logging.Debugf("TCP bridge received %d bytes from server for flow %s, data: %q",
-				n, f.key, string(payload[:min(n, 50)]))
+				n, f.key, string(payload[:minInt(n, 50)]))
 
 			// No protocol-specific heuristics; rely on flow control and ACKs.
 
@@ -1286,16 +1323,18 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 			if b.mssClamp > 0 && maxMSS > b.mssClamp {
 				maxMSS = b.mssClamp
 			}
-            mtuCap := 1460
-            if b.parent != nil {
-                effMTU := b.parent.EffectiveMTU()
-                if effMTU <= 0 { effMTU = b.parent.config.MTU }
-                mtuCap = effMTU - 40
-                if mtuCap < 536 {
-                    mtuCap = 536
-                }
-            }
-			baseSegMax := min(maxMSS, mtuCap)
+			mtuCap := 1460
+			if b.parent != nil {
+				effMTU := b.parent.EffectiveMTU()
+				if effMTU <= 0 {
+					effMTU = b.parent.config.MTU
+				}
+				mtuCap = effMTU - 40
+				if mtuCap < 536 {
+					mtuCap = 536
+				}
+			}
+			baseSegMax := minInt(maxMSS, mtuCap)
 			if baseSegMax <= 0 {
 				baseSegMax = 1000
 			}
@@ -1308,7 +1347,7 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 					if cw < 1 {
 						cw = f.mss * 2
 					}
-					allowed = min(allowed, cw-inFlight)
+					allowed = minInt(allowed, cw-inFlight)
 				}
 				if allowed <= 0 {
 					// No window; wait for ACK/window update notification or short timeout
@@ -1332,7 +1371,7 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 						if cw < 1 {
 							cw = f.mss * 2
 						}
-						allowed = min(allowed, cw-inFlight)
+						allowed = minInt(allowed, cw-inFlight)
 					}
 					if allowed <= 0 {
 						// Always log flow control issues (not just in debug mode)
@@ -1346,11 +1385,11 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 						continue
 					}
 				}
-				segMax := min(baseSegMax, allowed)
+				segMax := minInt(baseSegMax, allowed)
 				if segMax <= 0 {
-					segMax = min(baseSegMax, n-offset)
+					segMax = minInt(baseSegMax, n-offset)
 				}
-				segSize := min(segMax, n-offset)
+				segSize := minInt(segMax, n-offset)
 				segPayload := payload[offset : offset+segSize]
 
 				// Always use PSH|ACK for HTTP responses to ensure immediate delivery
@@ -1365,10 +1404,7 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 					f.serverNxt+uint32(offset), f.clientNxt, flags, segPayload, tosOut, ttlOut)
 
 				if seg != nil {
-					if b.debug {
-						logging.Debugf("tcp send flow=%s seq=%d una=%d nxt=%d wnd=%d cwnd=%d inflight=%d seg=%d",
-							f.key, f.serverNxt+uint32(offset), f.sndUna, f.serverNxt, f.advWnd, b.cwndBytes(f), inFlight, segSize)
-					}
+					// trimmed: per-flow send debug removed
 					logging.Debugf("TCP bridge sending segment %d-%d of %d bytes to client for flow %s",
 						offset, offset+segSize, n, f.key)
 
@@ -1379,18 +1415,18 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 					if poolingEnabled() && !poolWrapEnabled() {
 						out = append([]byte(nil), seg...)
 					}
-                    sent := false
+					sent := false
 					if b.paceUS > 0 {
 						time.Sleep(time.Duration(b.paceUS) * time.Microsecond)
 					}
-                if !sent {
-                    if b.sendToGuest(f, out) {
-                        f.toCliBytes += uint64(segSize)
-                        f.toCliPkts += 1
-                    } else {
-                        logging.Errorf("TCP bridge failed to send packet inline (no scheduler): flow=%s", f.key)
-                    }
-                }
+					if !sent {
+						if b.sendToGuest(f, out) {
+							f.toCliBytes += uint64(segSize)
+							f.toCliPkts += 1
+						} else {
+							logging.Errorf("TCP bridge failed to send packet inline (no scheduler): flow=%s", f.key)
+						}
+					}
 					// Track segment for retransmission
 					f.txMu.Lock()
 					f.txQueue = append(f.txQueue, struct {
@@ -1468,73 +1504,81 @@ func (b *tcpBridge) reader(f *tcpFlow) {
 // flushPending drains any pre-connect pending client->server data and then
 // flushes contiguous reassembly segments once a connection is available.
 func (b *tcpBridge) flushPending(f *tcpFlow) {
-    if f == nil || f.conn == nil {
-        return
-    }
-    // Drain pending FIFO
-    var batches [][]byte
-    f.pendMu.Lock()
-    if len(f.pending) > 0 {
-        batches = append(batches, f.pending...)
-        f.pending = nil
-        f.pendingBytes = 0
-    }
-    f.pendMu.Unlock()
-    for _, p := range batches {
-        if f.conn == nil { break }
-        if n, err := f.conn.Write(p); err == nil {
-            atomic.AddUint64(&b.metrics.BytesSent, uint64(n))
-            atomic.AddUint64(&b.metrics.PacketsSent, 1)
-            atomic.AddUint64(&b.parent.metrics.BytesSent, uint64(n))
-            atomic.AddUint64(&b.parent.metrics.PacketsSent, 1)
-            f.toSrvBytes += uint64(n)
-            f.toSrvPkts += 1
-            atomic.AddUint64(&b.pendFlush, 1)
-        } else {
-            atomic.AddUint64(&b.parent.metrics.Errors, 1)
-            break
-        }
-    }
-    // Now attempt to flush any contiguous reassembly segments
-    f.mu.Lock()
-    for len(f.ooo) > 0 {
-        s := f.ooo[0]
-        if s.seq != f.clientNxt { break }
-        if f.conn == nil { break }
-        if n, err := f.conn.Write(s.data); err != nil {
-            f.mu.Unlock()
-            atomic.AddUint64(&b.parent.metrics.Errors, 1)
-            return
-        } else {
-            atomic.AddUint64(&b.metrics.BytesSent, uint64(n))
-            atomic.AddUint64(&b.metrics.PacketsSent, 1)
-            atomic.AddUint64(&b.parent.metrics.BytesSent, uint64(n))
-            atomic.AddUint64(&b.parent.metrics.PacketsSent, 1)
-            f.toSrvBytes += uint64(n)
-            f.toSrvPkts += 1
-        }
-        f.ooo = f.ooo[1:]
-        f.futureBytes -= len(s.data)
-        f.clientNxt += uint32(len(s.data))
-    }
-    f.mu.Unlock()
+	if f == nil || f.conn == nil {
+		return
+	}
+	// Drain pending FIFO
+	var batches [][]byte
+	f.pendMu.Lock()
+	if len(f.pending) > 0 {
+		batches = append(batches, f.pending...)
+		f.pending = nil
+		f.pendingBytes = 0
+	}
+	f.pendMu.Unlock()
+	for _, p := range batches {
+		if f.conn == nil {
+			break
+		}
+		if n, err := f.conn.Write(p); err == nil {
+			atomic.AddUint64(&b.metrics.BytesSent, uint64(n))
+			atomic.AddUint64(&b.metrics.PacketsSent, 1)
+			atomic.AddUint64(&b.parent.metrics.BytesSent, uint64(n))
+			atomic.AddUint64(&b.parent.metrics.PacketsSent, 1)
+			f.toSrvBytes += uint64(n)
+			f.toSrvPkts += 1
+			atomic.AddUint64(&b.pendFlush, 1)
+		} else {
+			atomic.AddUint64(&b.parent.metrics.Errors, 1)
+			break
+		}
+	}
+	// Now attempt to flush any contiguous reassembly segments
+	f.mu.Lock()
+	for len(f.ooo) > 0 {
+		s := f.ooo[0]
+		if s.seq != f.clientNxt {
+			break
+		}
+		if f.conn == nil {
+			break
+		}
+		if n, err := f.conn.Write(s.data); err != nil {
+			f.mu.Unlock()
+			atomic.AddUint64(&b.parent.metrics.Errors, 1)
+			return
+		} else {
+			atomic.AddUint64(&b.metrics.BytesSent, uint64(n))
+			atomic.AddUint64(&b.metrics.PacketsSent, 1)
+			atomic.AddUint64(&b.parent.metrics.BytesSent, uint64(n))
+			atomic.AddUint64(&b.parent.metrics.PacketsSent, 1)
+			f.toSrvBytes += uint64(n)
+			f.toSrvPkts += 1
+		}
+		f.ooo = f.ooo[1:]
+		f.futureBytes -= len(s.data)
+		f.clientNxt += uint32(len(s.data))
+	}
+	f.mu.Unlock()
 }
 
 func (b *tcpBridge) removeFlow(key string) {
-    b.mu.Lock()
-    defer b.mu.Unlock()
-    if f, ok := b.flows[key]; ok {
-        logging.Debugf("TCP flow closed %s; toServer bytes=%d pkts=%d, toClient bytes=%d pkts=%d",
-            f.key, f.toSrvBytes, f.toSrvPkts, f.toCliBytes, f.toCliPkts)
-        if f.conn != nil { _ = f.conn.Close() }
-        if f.rtoStop != nil {
-            close(f.rtoStop)
-        }
-        delete(b.flows, key)
-        // (FlowManager removed)
-        atomic.AddUint64(&b.metrics.ConnectionsClosed, 1)
-        atomic.AddUint64(&b.parent.metrics.ConnectionsClosed, 1)
-    }
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if f, ok := b.flows[key]; ok {
+		logging.Debugf("TCP flow closed %s; toServer bytes=%d pkts=%d, toClient bytes=%d pkts=%d",
+			f.key, f.toSrvBytes, f.toSrvPkts, f.toCliBytes, f.toCliPkts)
+		if f.conn != nil {
+			_ = f.conn.Close()
+		}
+		if f.rtoStop != nil {
+			close(f.rtoStop)
+		}
+		delete(b.flows, key)
+		// (FlowManager removed)
+		atomic.AddUint64(&b.metrics.ConnectionsClosed, 1)
+		atomic.AddUint64(&b.parent.metrics.ConnectionsClosed, 1)
+	}
 }
 
 func (b *tcpBridge) reaper() {
@@ -1577,9 +1621,9 @@ func (b *tcpBridge) scheduleAck(f *tcpFlow) {
 		f.ackMu.Lock()
 		f.ackScheduled = false
 		f.ackMu.Unlock()
-        ack := buildIPv4TCP(f.dstIP, f.srcIP, f.dstPort, f.srcPort, f.serverNxt, f.clientNxt, 0x10, nil)
-        _ = b.sendToGuest(f, ack)
-    }()
+		ack := buildIPv4TCP(f.dstIP, f.srcIP, f.dstPort, f.srcPort, f.serverNxt, f.clientNxt, 0x10, nil)
+		_ = b.sendToGuest(f, ack)
+	}()
 }
 
 func (f *tcpFlow) touch() {
@@ -1686,14 +1730,16 @@ func tcpChecksum(tcp []byte, srcIP, dstIP [4]byte) uint16 {
 	return ^uint16(sum)
 }
 
-// min returns the minimum of two integers
-func min(a, b int) int {
+// ordered is a minimal constraint for types that support < and > comparisons
+// used by the generic min/max helpers below. We keep it local to avoid an
+// external dependency on x/exp/constraints.
+// Local typed helpers (avoid generics to keep compatibility with older toolchains)
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
-
 func maxInt(a, b int) int {
 	if a > b {
 		return a
@@ -1854,7 +1900,7 @@ func (b *tcpBridge) retransmitNextHole(f *tcpFlow) {
 	pkt := buildIPv4TCPWithIP(f.dstIP, f.srcIP, f.dstPort, f.srcPort,
 		seg.seq, f.clientNxt, 0x18, seg.data, tosOut, ttlOut)
 	if pkt != nil {
-                    _ = b.sendToGuest(f, pkt)
+		_ = b.sendToGuest(f, pkt)
 		if f.ccEnabled && f.cc != nil {
 			f.cc.OnLoss(false)
 		}
@@ -1880,68 +1926,67 @@ func (b *tcpBridge) cwndBytes(f *tcpFlow) int {
 // log spam, it logs at most once per 5 seconds per flow and includes the number of
 // suppressed messages since the previous emission.
 func (b *tcpBridge) logSendGated(f *tcpFlow, cause string, advWnd, inFlight, cw int) {
-    if b.gateLogDisabled {
-        return
-    }
-    const gateEvery = 5 * time.Second // Increased from 200ms to reduce log volume
-    now := time.Now()
-    f.gateMu.Lock()
-    defer f.gateMu.Unlock()
-    if !f.lastGateLog.IsZero() && now.Sub(f.lastGateLog) < gateEvery {
-        f.suppressedGates++
-        return
-    }
+	if b.gateLogDisabled {
+		return
+	}
+	const gateEvery = 5 * time.Second // Increased from 200ms to reduce log volume
+	now := time.Now()
+	f.gateMu.Lock()
+	defer f.gateMu.Unlock()
+	if !f.lastGateLog.IsZero() && now.Sub(f.lastGateLog) < gateEvery {
+		f.suppressedGates++
+		return
+	}
 
-    if f.suppressedGates > 0 {
-        if b.gateLogDebug {
-            logging.Debugf("TCP send-gated: flow=%s cause=%s advWnd=%d inflight=%d cwnd=%d (suppressed=%d)",
-                f.key, cause, advWnd, inFlight, cw, f.suppressedGates)
-        } else {
-            logging.Infof("TCP send-gated: flow=%s cause=%s advWnd=%d inflight=%d cwnd=%d (suppressed=%d)",
-                f.key, cause, advWnd, inFlight, cw, f.suppressedGates)
-        }
-    } else {
-        if b.gateLogDebug {
-            logging.Debugf("TCP send-gated: flow=%s cause=%s advWnd=%d inflight=%d cwnd=%d",
-                f.key, cause, advWnd, inFlight, cw)
-        } else {
-            logging.Infof("TCP send-gated: flow=%s cause=%s advWnd=%d inflight=%d cwnd=%d",
-                f.key, cause, advWnd, inFlight, cw)
-        }
-    }
-    f.lastGateLog = now
-    f.suppressedGates = 0
+	if f.suppressedGates > 0 {
+		if b.gateLogDebug {
+			logging.Debugf("TCP send-gated: flow=%s cause=%s advWnd=%d inflight=%d cwnd=%d (suppressed=%d)",
+				f.key, cause, advWnd, inFlight, cw, f.suppressedGates)
+		} else {
+			logging.Infof("TCP send-gated: flow=%s cause=%s advWnd=%d inflight=%d cwnd=%d (suppressed=%d)",
+				f.key, cause, advWnd, inFlight, cw, f.suppressedGates)
+		}
+	} else {
+		if b.gateLogDebug {
+			logging.Debugf("TCP send-gated: flow=%s cause=%s advWnd=%d inflight=%d cwnd=%d",
+				f.key, cause, advWnd, inFlight, cw)
+		} else {
+			logging.Infof("TCP send-gated: flow=%s cause=%s advWnd=%d inflight=%d cwnd=%d",
+				f.key, cause, advWnd, inFlight, cw)
+		}
+	}
+	f.lastGateLog = now
+	f.suppressedGates = 0
 }
 
 // trackRTOFlow adds a flow to the RTO tracking map and checks if we need to dump metrics
 func (b *tcpBridge) trackRTOFlow(flowKey string) {
-    // Decide whether a dump is needed without holding the lock during the dump
-    needDump := false
-    b.rtoMu.Lock()
-    // Add this flow to the active RTO flows map
-    b.rtoActiveFlows[flowKey] = true
-    if len(b.rtoActiveFlows) >= 3 {
-        if !b.rtoMetricsDumped || time.Since(b.rtoMetricsDumpTime) > 30*time.Second {
-            // Mark as dumped and record time under lock
-            b.rtoMetricsDumped = true
-            b.rtoMetricsDumpTime = time.Now()
-            needDump = true
-            // Schedule tracking reset to allow future dumps
-            time.AfterFunc(10*time.Second, func() {
-                b.rtoMu.Lock()
-                b.rtoMetricsDumped = false
-                b.rtoActiveFlows = make(map[string]bool)
-                b.rtoMu.Unlock()
-            })
-        }
-    }
-    b.rtoMu.Unlock()
-    if needDump {
-        b.dumpDetailedMetrics()
-    }
+	// Decide whether a dump is needed without holding the lock during the dump
+	needDump := false
+	b.rtoMu.Lock()
+	// Add this flow to the active RTO flows map
+	b.rtoActiveFlows[flowKey] = true
+	if len(b.rtoActiveFlows) >= 3 {
+		if !b.rtoMetricsDumped || time.Since(b.rtoMetricsDumpTime) > 30*time.Second {
+			// Mark as dumped and record time under lock
+			b.rtoMetricsDumped = true
+			b.rtoMetricsDumpTime = time.Now()
+			needDump = true
+			// Schedule tracking reset to allow future dumps
+			time.AfterFunc(10*time.Second, func() {
+				b.rtoMu.Lock()
+				b.rtoMetricsDumped = false
+				b.rtoActiveFlows = make(map[string]bool)
+				b.rtoMu.Unlock()
+			})
+		}
+	}
+	b.rtoMu.Unlock()
+	if needDump {
+		b.dumpDetailedMetrics()
+	}
 }
 
-// dumpDetailedMetrics logs detailed system metrics when multiple flows are in RTO state
 // dumpDetailedMetrics logs detailed system metrics when multiple flows are in RTO state
 // This function is designed to be robust against errors and always complete the metrics dump
 func (b *tcpBridge) dumpDetailedMetrics() {
@@ -2040,15 +2085,17 @@ func (b *tcpBridge) dumpDetailedMetrics() {
 				}
 			}()
 
-            if b.parent != nil {
-                dm := b.parent.DetailedMetrics()
-                // Prefer reporting wg_queue_full from processor metrics when present
-                var wgFull uint64
-                if dm.Processor != nil {
-                    if v, ok := dm.Processor["wg_queue_full"]; ok { wgFull = v }
-                }
-                logging.Warnf("Global Metrics: activeFlows=%d, rtoCount=%d, wg_queue_full=%d",
-                    dm.TCP.ActiveFlows, b.rtoCount, wgFull)
+			if b.parent != nil {
+				dm := b.parent.DetailedMetrics()
+				// Prefer reporting wg_queue_full from processor metrics when present
+				var wgFull uint64
+				if dm.Processor != nil {
+					if v, ok := dm.Processor["wg_queue_full"]; ok {
+						wgFull = v
+					}
+				}
+				logging.Warnf("Global Metrics: activeFlows=%d, rtoCount=%d, wg_queue_full=%d",
+					dm.TCP.ActiveFlows, b.rtoCount, wgFull)
 
 				// Log WireGuard metrics if available
 				if b.parent.processor != nil {
@@ -2060,11 +2107,9 @@ func (b *tcpBridge) dumpDetailedMetrics() {
 					}
 				}
 
-                // Flow control metrics (FlowManager) removed
-
-        // Log current TCP bridge settings
-        logging.Warnf("TCP Bridge Settings: mssClamp=%d, paceUS=%d, ackIdleGate=%v, ackIdleFail=%v",
-            b.mssClamp, b.paceUS, b.ackIdleGate, b.ackIdleFail)
+				// Log current TCP bridge settings
+				logging.Warnf("TCP Bridge Settings: mssClamp=%d, paceUS=%d, ackIdleGate=%v, ackIdleFail=%v",
+					b.mssClamp, b.paceUS, b.ackIdleGate, b.ackIdleFail)
 			}
 		}()
 	}()
