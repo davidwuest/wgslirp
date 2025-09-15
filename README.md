@@ -75,17 +75,24 @@ services:
     ports:
       - "51820:51820/udp"
     environment:
-      - "POOLING=1"
       
+      # Sensible defaults - probably 99% of configs would use this
+      - "POOLING=1"
       - "PROCESSOR_WORKERS=8"
       - "PROCESSOR_QUEUE_CAP=4096"
       - "WG_TUN_QUEUE_CAP=2048"
-
-      - "METRICS_INTERVAL=60s"
-      - "METRICS_FORMAT=text"
       - "TCP_ACK_DELAY_MS=5"
       - "TCP_ENABLE_SACK=1"
       
+      #  If you want tcp / flow debugging enabled 
+      #- "METRICS_INTERVAL=60s"
+      #- "METRICS_FORMAT=text"
+      #- "TCP_GATE_LOG=on"
+
+      # If you want to fill up your logs fast
+      #- "DEBUG=1"
+
+      # WG config - this MUST be set
       - "WG_PRIVATE_KEY=<server-private-key>"
       - "WG_LISTEN_PORT=51820"
       - "WG_MTU=1200"
@@ -96,7 +103,8 @@ services:
     restart: "no"
 ```
 
-### Building from Source
+### Building from Source 
+#### Container is at ghcr.io/irctrakz/wgslirp:latest
 
 To build from source:
 
@@ -131,12 +139,23 @@ Get up and running quickly with these steps:
 
 2. **Start the Router**:
    ```bash
-   docker run -d \
-     --name wgslirp \
-     -p 51820:51820/udp \
-     -e WG_PRIVATE_KEY=$(cat private.key) \
-     -e WG_PEERS="public_key=$(cat peer-public.key),allowed_ips=10.0.0.2/32" \
-     ghcr.io/irctrakz/wgslirp:latest
+    docker run --name wgslirp \
+      -p 51820:51820/udp \
+      -e POOLING=1 \
+      -e PROCESSOR_WORKERS=8 \
+      -e PROCESSOR_QUEUE_CAP=4096 \
+      -e WG_TUN_QUEUE_CAP=2048 \
+      -e TCP_ACK_DELAY_MS=5 \
+      -e TCP_ENABLE_SACK=1 \
+      -e TCP_GATE_LOG=off \
+      -e WG_PRIVATE_KEY=<private_key> \
+      -e WG_LISTEN_PORT=51820 \
+      -e WG_MTU=1200 \
+      -e WG_PEERS=0 \
+      -e WG_PEER_0_PUBLIC_KEY=<public_key> \
+      -e WG_PEER_0_ALLOWED_IPS=10.77.0.2/32 \
+      --restart=no \
+      ghcr.io/irctrakz/wgslirp:latest
    ```
 
 3. **Configure Client**:
@@ -144,7 +163,9 @@ Get up and running quickly with these steps:
    ```ini
    [Interface]
    PrivateKey = <client-private-key>
-   Address = 10.0.0.2/32
+   Address = 10.77.0.2/32
+   DNS = 8.8.8.8
+   MTU = 1200
    
    [Peer]
    PublicKey = <your-public-key>
@@ -177,13 +198,6 @@ The router is configured primarily through environment variables:
 | `WG_PEERS` | Comma-separated list of peer configurations | - |
 | `WG_OVERLAY_ROUTING` | Enable overlay routing mode (1/true/yes/on) | - |
 | `WG_OVERLAY_EXCLUDE_CIDRS` | Comma-separated CIDRs to exclude from overlay routing | - |
-
-### Peer Configuration Format
-
-Each peer in the `WG_PEERS` variable should follow this format:
-```
-public_key=<base64-key>,allowed_ips=<cidr1,cidr2,...>,endpoint=<host:port>,persistent_keepalive=<seconds>
-```
 
 ### System Configuration
 
@@ -292,7 +306,7 @@ Selected counters (subset):
 - WG plaintext: `plaintext_from_wg`, `plaintext_to_wg`, `queue_drops`.
 
 
-#### Tuning Example (docker-compose)
+#### Tuning Example (docker-compose) with metrics enabled
 
 ```yaml
 services:
@@ -305,21 +319,17 @@ services:
       - "POOLING=1"
       - "PROCESSOR_WORKERS=8"
       - "PROCESSOR_QUEUE_CAP=4096"
-      # FlowManager removed; no FLOW_QUEUE_CAP
       - "WG_TUN_QUEUE_CAP=2048"
       - "TCP_ACK_DELAY_MS=5"
       - "METRICS_INTERVAL=15s"
       - "METRICS_FORMAT=json"
-
       - "DEBUG=0"
-      # WireGuard settings (examples — replace with your values)
       - "WG_PRIVATE_KEY=<base64-private-key>"
       - "WG_LISTEN_PORT=51820"
       - "WG_MTU=1380"
       - "WG_PEERS=1"
       - "WG_PEER_0_PUBLIC_KEY=<base64-peer-public>"
       - "WG_PEER_0_ALLOWED_IPS=0.0.0.0/0"
-      - "WG_PEER_0_KEEPALIVE=25"
     restart: "no"
 ```
 
@@ -336,39 +346,22 @@ ICMP echo and other raw ICMP operations require raw socket privileges (e.g., `CA
 ### Basic WireGuard Router
 
 ```bash
-docker run -d \
-  --name wgslirp \
+docker run --name wgslirp \
   -p 51820:51820/udp \
-  -e WG_PRIVATE_KEY=<base64-private-key> \
-  -e WG_PEERS="public_key=<base64-public-key>,allowed_ips=10.0.0.2/32,endpoint=peer.example.com:51820" \
-  ghcr.io/irctrakz/wgslirp:latest
-```
-
-### With Metrics and Debug Logging
-
-```bash
-docker run -d \
-  --name wgslirp \
-  -p 51820:51820/udp \
-  -e WG_PRIVATE_KEY=<base64-private-key> \
-  -e WG_PEERS="public_key=<base64-public-key>,allowed_ips=10.0.0.2/32" \
-  -e DEBUG=1 \
-  -e METRICS_LOG=1 \
-  -e METRICS_INTERVAL=60s \
-  -e METRICS_FORMAT=json \
-  ghcr.io/irctrakz/wgslirp:latest
-```
-
-### With Overlay Routing
-
-```bash
-docker run -d \
-  --name wgslirp \
-  -p 51820:51820/udp \
-  -e WG_PRIVATE_KEY=<base64-private-key> \
-  -e WG_PEERS="public_key=<base64-public-key>,allowed_ips=10.0.0.0/24,192.168.1.0/24" \
-  -e WG_OVERLAY_ROUTING=1 \
-  -e WG_OVERLAY_EXCLUDE_CIDRS="172.16.0.0/12,169.254.0.0/16" \
+  -e POOLING=1 \
+  -e PROCESSOR_WORKERS=8 \
+  -e PROCESSOR_QUEUE_CAP=4096 \
+  -e WG_TUN_QUEUE_CAP=2048 \
+  -e TCP_ACK_DELAY_MS=5 \
+  -e TCP_ENABLE_SACK=1 \
+  -e TCP_GATE_LOG=off \
+  -e WG_PRIVATE_KEY=<private_key> \
+  -e WG_LISTEN_PORT=51820 \
+  -e WG_MTU=1200 \
+  -e WG_PEERS=0 \
+  -e WG_PEER_0_PUBLIC_KEY=<public_key> \
+  -e WG_PEER_0_ALLOWED_IPS=10.77.0.2/32 \
+  --restart=no \
   ghcr.io/irctrakz/wgslirp:latest
 ```
 
@@ -379,25 +372,21 @@ version: "2.4"
 
 services:
   wg-router:
-    image: wgserver:latest
-    container_name: wgserver
+    image: ghcr.io/irctrakz/wgslirp:latest
+    container_name: wgslirp
     ports:
       - "51820:51820/udp"
     environment:
-      - "POOLING=0"
+      - "POOLING=1"
       - "PROCESSOR_WORKERS=8"
       - "PROCESSOR_QUEUE_CAP=4096"
-      # FlowManager removed; no FLOW_QUEUE_CAP
       - "WG_TUN_QUEUE_CAP=2048"
       - "TCP_ACK_DELAY_MS=5"
       - "TCP_ENABLE_SACK=1"
-      - "METRICS_LOG=1"
-      - "METRICS_INTERVAL=15s"
-      - "DEBUG=0"
-      - "TCP_DEBUG_FLOW=0"
+      - "TCP_GATE_LOG=off"
       - "WG_PRIVATE_KEY=<private_key>"
       - "WG_LISTEN_PORT=51820"
-      - "WG_MTU=1380"
+      - "WG_MTU=1200"
       - "WG_PEERS=0"
       - "WG_PEER_0_PUBLIC_KEY=<public_key>"
       - "WG_PEER_0_ALLOWED_IPS=10.77.0.2/32"
@@ -424,18 +413,6 @@ services:
 
 ### Debugging
 
-Enable debug mode to get verbose logging:
-
-```bash
-docker run -d \
-  --name wgslirp \
-  -p 51820:51820/udp \
-  -e WG_PRIVATE_KEY=<base64-private-key> \
-  -e WG_PEERS="public_key=<base64-public-key>,allowed_ips=10.0.0.2/32" \
-  -e DEBUG=1 \
-  ghcr.io/irctrakz/wgslirp:latest
-```
-
 View logs with:
 
 ```bash
@@ -444,7 +421,7 @@ docker logs wgslirp
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Apache 2.0 - see the LICENSE file for details.
 
 ## Acknowledgments
 
