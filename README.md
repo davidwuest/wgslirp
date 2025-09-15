@@ -1,5 +1,6 @@
 
-![Docker Build](https://github.com/irctrakz/wgslirp/actions/workflows/docker.yml/badge.svg)
+[![Docker Build](https://github.com/irctrakz/wgslirp/actions/workflows/docker.yml/badge.svg)](https://github.com/irctrakz/wgslirp/actions/workflows/docker.yml)
+[![Go Tests](https://github.com/irctrakz/wgslirp/actions/workflows/go.yml/badge.svg)](https://github.com/irctrakz/wgslirp/actions/workflows/go.yml)
 
 # Userspace WireGuard slirp Router
 
