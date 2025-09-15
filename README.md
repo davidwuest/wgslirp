@@ -7,7 +7,7 @@ A high-performance, user-space WireGuard router that forwards decrypted IPv4 tra
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Installation](#installation)
-  - [Using Docker](#using-docker)git add -Agit commit -m "Initial commit"
+  - [Using Docker](#using-docker)
   - [Building from Source](#building-from-source)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
@@ -67,14 +67,33 @@ graph TD
 
 The easiest way to run the router is using Docker:
 
-```bash
-docker run -d \
-  --name wgslirp \
-  -p 51820:51820/udp \
-  -e WG_PRIVATE_KEY=<your-private-key> \
-  -e WG_LISTEN_PORT=51820 \
-  -e WG_PEERS=<peer-config> \
-ghcr.io/irctrakz/wgslirp:latest
+```yaml
+services:
+  wg-router:
+    image: ghcr.io/irctrakz/wgslirp:latest
+    container_name: wgslirp
+    ports:
+      - "51820:51820/udp"
+    environment:
+      - "POOLING=1"
+      
+      - "PROCESSOR_WORKERS=8"
+      - "PROCESSOR_QUEUE_CAP=4096"
+      - "WG_TUN_QUEUE_CAP=2048"
+
+      - "METRICS_INTERVAL=60s"
+      - "METRICS_FORMAT=text"
+      - "TCP_ACK_DELAY_MS=5"
+      - "TCP_ENABLE_SACK=1"
+      
+      - "WG_PRIVATE_KEY=<server-private-key>"
+      - "WG_LISTEN_PORT=51820"
+      - "WG_MTU=1200"
+      
+      - "WG_PEERS=0"
+      - "WG_PEER_0_PUBLIC_KEY=<client-public-key>"
+      - "WG_PEER_0_ALLOWED_IPS=10.77.0.2/32"
+    restart: "no"
 ```
 
 ### Building from Source
