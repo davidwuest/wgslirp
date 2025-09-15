@@ -3,7 +3,7 @@
 
 # Userspace WireGuard slirp Router
 
-A high-performance, user-space WireGuard router that forwards decrypted IPv4 traffic via generic TCP/UDP/ICMP socket bridges (slirp-style), requiring no kernel privileges or custom netstacks.
+A high-performance, user-space WireGuard router that forwards decrypted IPv4 traffic via generic TCP/UDP/ICMP socket bridges (slirp-style), requiring zero kernel privileges or custom netstacks.
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ A high-performance, user-space WireGuard router that forwards decrypted IPv4 tra
 
 ## Overview
 
-This router combines WireGuard VPN with a userspace networking implementation to provide efficient, secure, container-friendly routing. It uses a slirp-style approach to handle TCP, UDP, and ICMP traffic between WireGuard tunnels and the host network.
+This router combines WireGuard VPN with a userspace networking implementation to provide efficient, secure, container-friendly routing. It uses a slirp-style approach to handle TCP, UDP, and ICMP (when running with CAP_NET_RAW) traffic between WireGuard tunnels and the host network.
 
 ### Key Features
 
@@ -41,7 +41,7 @@ The router consists of several key components:
 
 1. **WireGuard Interface**: Handles encrypted tunnel traffic using the WireGuard protocol
 2. **Socket Interface**: Manages TCP/UDP bridges for network traffic translation
-3. **Simple Slirp Bridges**: Direct inline delivery between slirp bridges and the processor. No FlowManager or egress limiter — simpler, predictable pipeline by default.
+3. **Slirp Bridges**: Direct inline delivery between slirp bridges and the processor (No FlowManager or egress limiter — simpler, predictable pipeline).
 4. **Metrics Reporter**: Collects and reports performance metrics
 
 The system uses a packet processing pipeline to efficiently route traffic between WireGuard tunnels and the host network.
@@ -91,6 +91,7 @@ services:
       #- "METRICS_INTERVAL=60s"
       #- "METRICS_FORMAT=text"
       #- "TCP_GATE_LOG=on"
+      - "TCP_GATE_LOG=off"
 
       # If you want to fill up your logs fast
       #- "DEBUG=1"
