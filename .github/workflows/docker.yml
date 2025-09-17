@@ -48,7 +48,7 @@ jobs:
           # Build both arches on master; PRs build amd64 only for speed
           platforms: ${{ github.ref_name == 'master' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           tags: |
-            ghcr.io/irctrakz/wgslirp:latest
-            ghcr.io/irctrakz/wgslirp:sha-${{ github.sha }}
+            ghcr.io/${{ github.actor }}/wgslirp:latest
+            ghcr.io/${{ github.actor }}/wgslirp:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
