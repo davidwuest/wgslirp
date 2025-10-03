@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -82,6 +83,15 @@ func main() {
 	if metricsEnabled {
 		go runMetricsReporter(si, wgtun, dev)
 	}
+
+	// Health check endpoint
+	go func() {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		http.ListenAndServe(":8080", nil)
+	}()
 
 	// Wait for termination
 	sigc := make(chan os.Signal, 2)

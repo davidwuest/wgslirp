@@ -27,6 +27,7 @@ COPY --from=build /src/wgslirp /usr/local/bin/wgslirp
 RUN chown -R wgslirp:wgslirp /app
 
 EXPOSE 51820/udp
+EXPOSE 8080/tcp
 
 # Switch to non-root user
 USER wgslirp
