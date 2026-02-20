@@ -48,7 +48,11 @@ func main() {
 	if mtu <= 0 {
 		mtu = 1380
 	}
-	scfg := socket.Config{IPAddress: "0.0.0.0", MTU: mtu, Protocol: "ip4:tcp"}
+	proto := os.Getenv("SOCKET_PROTOCOL")
+	 if proto == "" {
+	     proto = "ip4:tcp"
+	 }
+	scfg := socket.Config{IPAddress: "0.0.0.0", MTU: mtu, Protocol: proto}
 	si := socket.NewSocketInterface(scfg)
 
 	// Create WG TUN bound to the socket writer
