@@ -8,19 +8,34 @@ A high-performance, user-space WireGuard router that forwards decrypted IPv4 tra
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Installation](#installation)
-  - [Using Docker](#using-docker)
-  - [Building from Source](#building-from-source)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-  - [WireGuard Configuration](#wireguard-configuration)
-  - [System Configuration](#system-configuration)
-- [Usage Examples](#usage-examples)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
+- [Userspace WireGuard slirp Router](#userspace-wireguard-slirp-router)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+    - [Key Features](#key-features)
+  - [Architecture](#architecture)
+  - [Installation](#installation)
+    - [Using Docker](#using-docker)
+    - [Building from Source](#building-from-source)
+      - [Container is at ghcr.io/irctrakz/wgslirp:latest](#container-is-at-ghcrioirctrakzwgslirplatest)
+  - [Quick Start](#quick-start)
+  - [Configuration](#configuration)
+    - [WireGuard Configuration](#wireguard-configuration)
+    - [System Configuration](#system-configuration)
+    - [Environment Variables (reference)](#environment-variables-reference)
+    - [Performance Tuning (optional)](#performance-tuning-optional)
+    - [Simple Mode](#simple-mode)
+    - [Metrics Reporter](#metrics-reporter)
+    - [Kubernetes and AWS ECS](#kubernetes-and-aws-ecs)
+      - [Tuning Example (docker-compose) with metrics enabled](#tuning-example-docker-compose-with-metrics-enabled)
+    - [ICMP Privileges](#icmp-privileges)
+  - [Usage Examples](#usage-examples)
+    - [Basic WireGuard Router](#basic-wireguard-router)
+    - [Docker Compose full example](#docker-compose-full-example)
+  - [Troubleshooting](#troubleshooting)
+    - [Common Issues](#common-issues)
+    - [Debugging](#debugging)
+  - [License](#license)
+  - [Acknowledgments](#acknowledgments)
 
 ## Overview
 
@@ -32,7 +47,7 @@ This router combines WireGuard VPN with a userspace networking implementation to
 - **User-space Networking**: TCP/UDP bridges implemented in userspace
 - **Protocol Support**: Handles TCP, UDP, and ICMP traffic with NAT capabilities
 - **Performance Monitoring**: Built-in metrics collection and reporting
-- **Health Checking**: Integrated health checks for monitoring system status
+- **Health Checking**: Integrated health checks for monitoring system status and service ready
 - **Container Ready**: Designed to run in containerized environments
 - **Configurable**: Extensive configuration options via environment variables
 
@@ -248,6 +263,7 @@ Metrics and health
 - `HEALTH_HTTP_URL`: optional HTTP URL to fetch periodically.
 - `HEALTH_DNS_NAME`: optional DNS name to resolve (A-record).
 - `HEALTH_DNS_IP`: optional dotted-quad to check reachability.
+- Health check for the container returning ok on tcp /health port:8080
 
 Packet processing and TUN (userspace)
 
@@ -310,6 +326,7 @@ Selected counters (subset):
 - Async dial/pending (tcp slirp): `dial_start`, `dial_ok`, `dial_fail`, `dial_inflight`, `pend_enq`, `pend_flush`, `pend_drop`.
 - WG plaintext: `plaintext_from_wg`, `plaintext_to_wg`, `queue_drops`.
 
+### Kubernetes and AWS ECS
 
 #### Tuning Example (docker-compose) with metrics enabled
 
@@ -343,6 +360,10 @@ These values have proven effective for high‑throughput, low‑latency operatio
 ### ICMP Privileges
 
 ICMP echo and other raw ICMP operations require raw socket privileges (e.g., `CAP_NET_RAW`). In typical container environments without this capability, the router will silently drop ICMP packets from guests (logged at debug level) to avoid disrupting TCP/UDP traffic. If ICMP is required, grant the container appropriate capabilities or run outside a restricted environment.
+
+| Environment Variable | Description | Default |
+|----------------------|-------------|---------|
+| `SOCKET_PROTOCOL` | `ip4:icmp` open the raw ICMP socket| - |
 
 **Note**: To disable metrics completely, ensure both `METRICS_LOG` and `METRICS_INTERVAL` are unset or empty. Setting either of these variables to any non-empty value will enable metrics reporting.
 
